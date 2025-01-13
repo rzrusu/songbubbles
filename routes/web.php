@@ -2,11 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\SpotifyController;
 
-Route::get('/', function () {
-    return Inertia::render('Index/View');
-});
-
-Route::get('/spotify', function () {
-    return Inertia::render('Index/Spotify');
-});
+Route::get('/', [SpotifyController::class, 'index']);
