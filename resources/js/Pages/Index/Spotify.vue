@@ -18,10 +18,11 @@ const initialized = ref(false)
 let simulation = null // Store the D3 simulation instance
 let zoom = null // Store the D3 zoom behavior
 let currentTransform = { x: 0, y: 0, k: 1 } // Track current zoom/pan state
+const selectedTrack = ref(null) // Track the currently selected track ID
 
 // Constants for size normalization
-const minSize = 150
-const maxSize = 600
+const minSize = 300 // Updated min size
+const maxSize = 800
 const scalingFactor = 3
 
 // Helper function to generate a random gray color
@@ -32,12 +33,7 @@ const getRandomGray = () => {
 
 // Function to reprocess tracks when data changes
 const processTracks = () => {
-  console.log('Processing tracks:', props.tracks) // Debugging
-
-  if (!props.tracks || props.tracks.length === 0) {
-    console.warn('No tracks available to process.')
-    return
-  }
+  if (!props.tracks || props.tracks.length === 0) return
 
   const maxPopularity = Math.max(...props.tracks.map(t => t.popularity))
 
@@ -51,55 +47,76 @@ const processTracks = () => {
     y: window.innerHeight / 2 + (Math.random() - 0.5) * 200
   }))
 
-  console.log('Processed tracks:', processedTracks.value) // Debugging
   initializeSimulation()
 }
 
 // Function to initialize or restart the D3 simulation
 const initializeSimulation = () => {
-  console.log('Initializing simulation...') // Debugging
-
-  if (simulation) {
-    simulation.stop() // Stop any existing simulation
-  }
+  if (simulation) simulation.stop()
 
   simulation = d3.forceSimulation(processedTracks.value)
+    .alphaDecay(0.001)
+    .velocityDecay(0.6)
     .force('center', d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2))
-    .force('collision', d3.forceCollide(d => d.size / 2 + 20)) // Add collision padding
-    .force('charge', d3.forceManyBody().strength(-100))
-    .force('x', d3.forceX(window.innerWidth / 2).strength(0.1))
-    .force('y', d3.forceY(window.innerHeight / 2).strength(0.1))
+    .force('collision', d3.forceCollide(d => d.size / 2 + 40))
+    .force('charge', d3.forceManyBody().strength(-200))
+    .force('x', d3.forceX(window.innerWidth / 2).strength(0.05))
+    .force('y', d3.forceY(window.innerHeight / 2).strength(0.05))
     .on('tick', () => {
+      const container = d3.select("#zoomable-container")
+      container.style("transform", `translate(${currentTransform.x}px, ${currentTransform.y}px) scale(${currentTransform.k})`)
       processedTracks.value = [...processedTracks.value]
     })
 
   initialized.value = true
 }
 
-// Function to initialize zoom behavior
-const initializeZoom = () => {
-  console.log('Initializing zoom...') // Debugging
+// Function to shift elements dynamically when a song is clicked
+const bringToFront = (trackId) => {
+  selectedTrack.value = trackId
+  const selected = processedTracks.value.find(t => t.id === trackId)
 
+  if (!selected) return
+
+  simulation
+    .force('collision', d3.forceCollide(d => {
+      if (d.id === trackId) {
+        return d.size + 60
+      }
+      return d.size / 2 + 40
+    }))
+    .force('charge', d3.forceManyBody().strength(d => (d.id === trackId ? -400 : -200)))
+    .alpha(0.3)
+    .restart()
+}
+
+const initializeZoom = () => {
   const container = d3.select("#zoomable-container")
   const wrapper = d3.select("#zoomable-wrapper")
 
   zoom = d3.zoom()
-    .scaleExtent([0.5, 5]) // Set zoom range
+    .scaleExtent([0.2, 5])
     .on("zoom", (event) => {
-      currentTransform = event.transform // Save current transform
+      currentTransform = event.transform
       container.style("transform", `translate(${event.transform.x}px, ${event.transform.y}px) scale(${event.transform.k})`)
     })
 
   wrapper.call(zoom)
 
-  // Apply initial zoom transform if available
-  wrapper.call(zoom.transform, d3.zoomIdentity.translate(currentTransform.x, currentTransform.y).scale(currentTransform.k))
+  const initialScale = 0.3
+  const translateX = (window.innerWidth - window.innerWidth * initialScale) / 2
+  const translateY = (window.innerHeight - window.innerHeight * initialScale) / 2
+
+  wrapper.call(
+    zoom.transform,
+    d3.zoomIdentity.translate(translateX, translateY).scale(initialScale)
+  )
+
+  currentTransform = { x: translateX, y: translateY, k: initialScale }
 }
 
-// Watch for changes in tracks and reprocess them
 watch(() => props.tracks, processTracks, { immediate: true })
 
-// Function to send search query to the backend
 const searchSpotify = () => {
   if (!search.value) {
     alert('Please enter a search query.')
@@ -110,10 +127,9 @@ const searchSpotify = () => {
 }
 
 onMounted(() => {
-  console.log('Component mounted, initializing...') // Debugging
   window.addEventListener("wheel", (event) => event.preventDefault(), { passive: false })
-  processTracks() // Process initial tracks
-  initializeZoom() // Initialize zoom behavior
+  processTracks()
+  initializeZoom()
 })
 </script>
 
@@ -124,7 +140,6 @@ onMounted(() => {
       <button @click="searchSpotify">Search</button>
     </div>
     <Head title="Spotify" />
-    <!-- Div Container for Zoom and Pan -->
     <div
       id="zoomable-wrapper"
       class="w-screen h-screen bg-black overflow-hidden relative"
@@ -137,6 +152,7 @@ onMounted(() => {
         <div
           v-for="track in processedTracks"
           :key="track.id || track.name"
+          @click="bringToFront(track.id)" 
           :style="{ 
             width: track.size + 'px',
             height: track.size + 'px',
@@ -144,9 +160,10 @@ onMounted(() => {
             backgroundColor: track.color,
             backgroundImage: `url(${track.album.images[0].url})`,
             backgroundSize: 'cover',
-            backgroundPosition: 'center'
+            backgroundPosition: 'center',
+            outline: selectedTrack === track.id ? '40px solid rgba(255, 255, 255, 0.1)' : 'none' // Add border if selected
           }"
-          class="absolute rounded-lg shadow-lg flex flex-col items-center justify-end text-white text-center p-2"
+          class="absolute rounded-lg shadow-lg flex flex-col items-center justify-end text-white text-center p-4 hover:cursor-pointer"
         >
           <div 
             class="backdrop-blur-sm bg-black/60 w-full rounded-lg p-2"
@@ -170,8 +187,7 @@ onMounted(() => {
   </Layout>
 </template>
 
-<style>
-/* Add CSS for text truncation */
+<style scoped>
 .truncate-text {
   display: -webkit-box;
   -webkit-line-clamp: 2; /* Limit to 2 lines */
