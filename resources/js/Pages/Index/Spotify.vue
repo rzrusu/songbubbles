@@ -1,7 +1,7 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import Layout from '@/Layouts/Layout.vue'
-import { Head } from '@inertiajs/vue3'
+import { Head, router } from '@inertiajs/vue3'
 import * as d3 from 'd3'
 
 // Define props
@@ -12,14 +12,17 @@ const props = defineProps({
   }
 })
 
-// Reactive variables
+let search = ref('')
 const processedTracks = ref([])
-const initialized = ref(false) // Tracks if initial zoom has been applied
+const initialized = ref(false)
+let simulation = null // Store the D3 simulation instance
+let zoom = null // Store the D3 zoom behavior
+let currentTransform = { x: 0, y: 0, k: 1 } // Track current zoom/pan state
 
 // Constants for size normalization
 const minSize = 150
 const maxSize = 600
-const scalingFactor = 3 // Higher value for more dramatic differences
+const scalingFactor = 3
 
 // Helper function to generate a random gray color
 const getRandomGray = () => {
@@ -27,76 +30,99 @@ const getRandomGray = () => {
   return `rgb(${grayValue}, ${grayValue}, ${grayValue})`
 }
 
-onMounted(() => {
-  // Prevent page scrolling on wheel events
-  window.addEventListener("wheel", (event) => event.preventDefault(), { passive: false })
+// Function to reprocess tracks when data changes
+const processTracks = () => {
+  console.log('Processing tracks:', props.tracks) // Debugging
 
-  // Find the maximum popularity across all songs
+  if (!props.tracks || props.tracks.length === 0) {
+    console.warn('No tracks available to process.')
+    return
+  }
+
   const maxPopularity = Math.max(...props.tracks.map(t => t.popularity))
 
-  // Normalize sizes using exponential scaling
-  const normalizedTracks = props.tracks.map(track => ({
+  processedTracks.value = props.tracks.map(track => ({
     ...track,
     size:
       minSize +
-      Math.pow((track.popularity / maxPopularity), scalingFactor) * (maxSize - minSize), // Exponential scaling
+      Math.pow((track.popularity / maxPopularity), scalingFactor) * (maxSize - minSize),
     color: getRandomGray(),
-    x: Math.random() * window.innerWidth, // Random initial x position
-    y: Math.random() * window.innerHeight // Random initial y position
+    x: window.innerWidth / 2 + (Math.random() - 0.5) * 200,
+    y: window.innerHeight / 2 + (Math.random() - 0.5) * 200
   }))
 
-  // Create D3 simulation
-  const simulation = d3.forceSimulation(normalizedTracks)
+  console.log('Processed tracks:', processedTracks.value) // Debugging
+  initializeSimulation()
+}
+
+// Function to initialize or restart the D3 simulation
+const initializeSimulation = () => {
+  console.log('Initializing simulation...') // Debugging
+
+  if (simulation) {
+    simulation.stop() // Stop any existing simulation
+  }
+
+  simulation = d3.forceSimulation(processedTracks.value)
     .force('center', d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2))
     .force('collision', d3.forceCollide(d => d.size / 2 + 20)) // Add collision padding
-    .force('charge', d3.forceManyBody().strength(-100)) // Add more repulsion for spacing
+    .force('charge', d3.forceManyBody().strength(-100))
     .force('x', d3.forceX(window.innerWidth / 2).strength(0.1))
     .force('y', d3.forceY(window.innerHeight / 2).strength(0.1))
     .on('tick', () => {
-      processedTracks.value = [...normalizedTracks]
+      processedTracks.value = [...processedTracks.value]
     })
 
-  setTimeout(() => {
-    simulation.stop()
+  initialized.value = true
+}
 
-    // Calculate initial zoom after simulation is complete
-    const xExtent = d3.extent(normalizedTracks, d => d.x - d.size / 2)
-    const yExtent = d3.extent(normalizedTracks, d => d.y - d.size / 2)
+// Function to initialize zoom behavior
+const initializeZoom = () => {
+  console.log('Initializing zoom...') // Debugging
 
-    const bboxWidth = xExtent[1] - xExtent[0]
-    const bboxHeight = yExtent[1] - yExtent[0]
+  const container = d3.select("#zoomable-container")
+  const wrapper = d3.select("#zoomable-wrapper")
 
-    // Calculate initial zoom level
-    const scale = Math.min(
-      window.innerWidth / (bboxWidth + 100), // Add padding
-      window.innerHeight / (bboxHeight + 100)
-    )
+  zoom = d3.zoom()
+    .scaleExtent([0.5, 5]) // Set zoom range
+    .on("zoom", (event) => {
+      currentTransform = event.transform // Save current transform
+      container.style("transform", `translate(${event.transform.x}px, ${event.transform.y}px) scale(${event.transform.k})`)
+    })
 
-    const translateX = window.innerWidth / 2 - (xExtent[0] + bboxWidth / 2) * scale
-    const translateY = window.innerHeight / 2 - (yExtent[0] + bboxHeight / 2) * scale
+  wrapper.call(zoom)
 
-    const container = d3.select("#zoomable-container")
-    const wrapper = d3.select("#zoomable-wrapper")
+  // Apply initial zoom transform if available
+  wrapper.call(zoom.transform, d3.zoomIdentity.translate(currentTransform.x, currentTransform.y).scale(currentTransform.k))
+}
 
-    const zoom = d3.zoom()
-      .scaleExtent([0.5, 5]) // Set zoom range
-      .on("zoom", (event) => {
-        container.style("transform", `translate(${event.transform.x}px, ${event.transform.y}px) scale(${event.transform.k})`)
-      })
+// Watch for changes in tracks and reprocess them
+watch(() => props.tracks, processTracks, { immediate: true })
 
-    wrapper.call(zoom)
+// Function to send search query to the backend
+const searchSpotify = () => {
+  if (!search.value) {
+    alert('Please enter a search query.')
+    return
+  }
 
-    // Apply initial zoom and pan
-    wrapper.call(zoom.transform, d3.zoomIdentity.translate(translateX, translateY).scale(scale))
+  router.post('/search', { query: search.value }, { preserveState: true })
+}
 
-    // Mark initialization as complete to render elements
-    initialized.value = true
-  }, 1000)
+onMounted(() => {
+  console.log('Component mounted, initializing...') // Debugging
+  window.addEventListener("wheel", (event) => event.preventDefault(), { passive: false })
+  processTracks() // Process initial tracks
+  initializeZoom() // Initialize zoom behavior
 })
 </script>
 
 <template>
   <Layout>
+    <div class="absolute top-0 left-0 bg-red-500 m-4 z-50">
+      <input type="text" v-model="search" placeholder="Search" />
+      <button @click="searchSpotify">Search</button>
+    </div>
     <Head title="Spotify" />
     <!-- Div Container for Zoom and Pan -->
     <div
@@ -104,7 +130,10 @@ onMounted(() => {
       class="w-screen h-screen bg-black overflow-hidden relative"
       :class="{ hidden: !initialized }" 
     >
-      <div id="zoomable-container" class="absolute top-0 left-0">
+      <div v-if="processedTracks.length === 0" class="text-white text-center">
+        No tracks available to display.
+      </div>
+      <div v-else id="zoomable-container" class="absolute top-0 left-0">
         <div
           v-for="track in processedTracks"
           :key="track.id || track.name"

@@ -51,4 +51,39 @@ class SpotifyController extends Controller
             'tracks' => $tracks_array
         ]);
     }
+
+    public function search(Request $request)
+    {
+
+        $query = $request->input('query');
+
+        if (!$query) {
+            return back()->withErrors(['query' => 'Search query is required.']);
+        }
+
+        $spotify = new Spotify();
+
+        // Search albums by query
+        $albums = Spotify::searchAlbums($query)->get();
+
+        if (empty($albums['albums']['items'])) {
+            return back()->withErrors(['query' => 'No results found for this query.']);
+        }
+
+        $album_id = $albums['albums']['items'][0]['id'];
+
+        $tracks = Spotify::albumTracks($album_id)->get();
+
+        // Fetch detailed track data
+        $tracks_array = [];
+        foreach ($tracks['items'] as $track) {
+            $track_info = Spotify::track($track['id'])->get();
+            $tracks_array[] = $track_info;
+        }
+
+        // Send the new tracks to the frontend
+        return Inertia::render('Index/Spotify', [
+            'tracks' => $tracks_array
+        ]);
+    }
 }
