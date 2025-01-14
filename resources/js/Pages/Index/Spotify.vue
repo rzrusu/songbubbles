@@ -141,20 +141,44 @@ onMounted(() => {
             width: track.size + 'px',
             height: track.size + 'px',
             transform: `translate(${track.x - track.size / 2}px, ${track.y - track.size / 2}px)`,
-            backgroundColor: track.color
+            backgroundColor: track.color,
+            backgroundImage: `url(${track.album.images[0].url})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
           }"
-          class="absolute rounded-lg shadow-lg flex flex-col items-center justify-center text-white text-center"
+          class="absolute rounded-lg shadow-lg flex flex-col items-center justify-end text-white text-center p-2"
         >
-          <!-- Track Name -->
-          <div class="text-2xl font-bold">
-            {{ track.name }}
-          </div>
-          <!-- Track Popularity -->
-          <div class="text-xl text-gray-300 mt-1">
-            {{ track.popularity }}
+          <div 
+            class="backdrop-blur-sm bg-black/60 w-full rounded-lg p-2"
+          >
+            <div 
+              class="font-bold truncate-text"
+              :style="{ fontSize: (track.size / 12) + 'px' }" 
+            >
+              {{ track.name }}
+            </div>
+            <div 
+              class="text-gray-300 mt-1"
+              :style="{ fontSize: (track.size / 16) + 'px' }" 
+            >
+              {{ track.popularity }}
+            </div>
           </div>
         </div>
       </div>
     </div>
   </Layout>
 </template>
+
+<style>
+/* Add CSS for text truncation */
+.truncate-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* Limit to 2 lines */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-wrap: break-word;
+  white-space: normal;
+}
+</style>
