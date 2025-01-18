@@ -1,21 +1,28 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed, onUnmounted } from 'vue'
 import Layout from '@/Layouts/Layout.vue'
 import { Head, router } from '@inertiajs/vue3'
 import * as d3 from 'd3'
 import { Vibrant } from "node-vibrant/browser";
 
+// Initialize all refs at the top
+const selectedAlbums = ref([])
+const searchResults = ref([])
+const showResults = ref(false)
+const search = ref('')
+
 // Define props
 const props = defineProps({
   tracks: {
     type: Array,
-    required: true
+    default: () => []
+  },
+  results: {
+    type: Array,
+    default: () => []
   }
 })
 
-let search = ref('')
-const processedTracks = ref([])
-const initialized = ref(false)
 let simulation = null // Store the D3 simulation instance
 let zoom = null // Store the D3 zoom behavior
 let currentTransform = { x: 0, y: 0, k: 1 } // Track current zoom/pan state
@@ -23,10 +30,22 @@ const selectedTrack = ref(null) // Track the currently selected track ID
 const trackColors = ref({}) // Store colors for each track
 const isLoading = ref(true)
 
+const processedTracks = ref([])
+const initialized = ref(false)
+
 // Constants for size normalization
 const minSize = 300 // Updated min size
 const maxSize = 800
 const scalingFactor = 5
+
+// Add loading state for search
+const isSearching = ref(false)
+
+// Add state for showing album management menu
+const showAlbumManager = ref(false)
+
+// Add constant for max albums
+const MAX_ALBUMS = 5
 
 const getVibrantColor = async (imageUrl) => {
   try {
@@ -186,29 +205,151 @@ const adjustSizesForMobile = () => {
 
 watch(() => props.tracks, processTracks, { immediate: true })
 
-const handleSearch = () => {
+// Watch for props.results changes
+watch(() => props.results, (newResults) => {
+  searchResults.value = newResults || []
+}, { immediate: true })
+
+// Modify search handling
+const handleSearch = async () => {
   if (!search.value) {
-    alert('Please enter a search query.')
+    showResults.value = false
+    isSearching.value = false
     return
   }
   
+  showResults.value = true
+  showAlbumManager.value = false
+  isSearching.value = true
+  
+  router.visit('/search-preview', { 
+    method: 'post',
+    data: { query: search.value },
+    preserveScroll: true,
+    preserveState: true,
+    onSuccess: () => {
+      isSearching.value = false
+    },
+    onError: () => {
+      isSearching.value = false
+      showResults.value = false
+      console.error('Search failed')
+    }
+  })
+}
+
+// Update the search watcher with additional safeguards
+watch(search, (newValue) => {
+  if (!newValue || newValue.length < 2) {
+    showResults.value = false
+    isSearching.value = false
+    return
+  }
+  
+  if (newValue.length >= 2) {
+    handleSearch()
+    showAlbumManager.value = false
+  }
+}, { debounce: 300 })
+
+// Handle album selection
+const toggleAlbumSelection = (album) => {
+  if (!selectedAlbums.value) {
+    selectedAlbums.value = []
+  }
+  
+  const index = selectedAlbums.value.findIndex(a => a.id === album.id)
+  if (index === -1) {
+    // Check if adding this album would exceed the limit
+    if (getCurrentAlbums.value.length + selectedAlbums.value.length >= MAX_ALBUMS) {
+      alert('Maximum of 5 albums allowed')
+      return
+    }
+    // Check if album is already in current tracks
+    if (getCurrentAlbums.value.some(a => a.id === album.id)) {
+      alert('This album is already in your selection')
+      return
+    }
+    selectedAlbums.value.push(album)
+  } else {
+    selectedAlbums.value.splice(index, 1)
+  }
+}
+
+// Add selected albums to visualization
+const addSelectedAlbums = () => {
   isLoading.value = true
-  router.post('/search', { 
-    query: search.value 
+  router.post('/add-albums', {
+    albumIds: selectedAlbums.value.map(album => album.id),
+    currentTracks: processedTracks.value // Send current tracks to backend
   }, {
     preserveState: true,
     onSuccess: () => {
-      setTimeout(() => {
-        isLoading.value = false
-      }, 1500)
+      selectedAlbums.value = []
+      showResults.value = false
+      search.value = ''
     }
   })
+}
+
+// Function to remove an album's tracks
+const removeAlbum = (albumId) => {
+  // Filter out tracks from the specified album
+  processedTracks.value = processedTracks.value.filter(track => track.album.id !== albumId)
+  // Restart simulation
+  initializeSimulation()
+}
+
+// Helper function to get unique albums from tracks
+const getCurrentAlbums = computed(() => {
+  const albums = new Map()
+  processedTracks.value.forEach(track => {
+    if (!albums.has(track.album.id)) {
+      albums.set(track.album.id, track.album)
+    }
+  })
+  return Array.from(albums.values())
+})
+
+// Add computed for remaining album slots
+const remainingAlbumSlots = computed(() => {
+  return MAX_ALBUMS - getCurrentAlbums.value.length
+})
+
+// Modify the album manager toggle
+const toggleAlbumManager = () => {
+  showAlbumManager.value = !showAlbumManager.value
+  if (showAlbumManager.value) {
+    showResults.value = false
+    search.value = '' // Optional: clear search when opening album manager
+  }
+}
+
+// Add click outside handler
+const closeMenus = (event) => {
+  // Check if click is outside both menus and the search bar
+  const searchContainer = document.querySelector('#search-container')
+  const albumManager = document.querySelector('#album-manager')
+  const searchResults = document.querySelector('#search-results')
+  
+  if (!searchContainer?.contains(event.target) && 
+      !albumManager?.contains(event.target) && 
+      !searchResults?.contains(event.target)) {
+    showResults.value = false
+    showAlbumManager.value = false
+  }
 }
 
 onMounted(() => {
   window.addEventListener("wheel", (event) => event.preventDefault(), { passive: false })
   processTracks()
   initializeZoom()
+  document.addEventListener('click', closeMenus)
+})
+
+// Clean up event listener
+onUnmounted(() => {
+  document.removeEventListener('click', closeMenus)
 })
 </script>
 
@@ -216,24 +357,128 @@ onMounted(() => {
   <Layout>
     <Head title="Spotify" />
     
-    <!-- Move search to bottom center and style it -->
-    <div class="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+    <!-- Search results dropdown with loading state -->
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out"
+      leave-active-class="transition-all duration-200 ease-in"
+      enter-from-class="transform translate-y-4 opacity-0"
+      leave-to-class="transform translate-y-4 opacity-0"
+    >
+      <div v-if="showResults" 
+           id="search-results"
+           class="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 w-[500px] max-h-[400px] overflow-y-auto bg-black/40 backdrop-blur-xl rounded-xl border border-white/20">
+        <!-- Add album limit indicator -->
+        <div class="px-4 pt-3 pb-2 border-b border-white/10">
+          <div class="text-white/60 text-sm">
+            {{ remainingAlbumSlots }} album{{ remainingAlbumSlots === 1 ? '' : 's' }} remaining
+          </div>
+        </div>
+        
+        <!-- Loading state -->
+        <div v-if="isSearching" class="p-8 text-center text-white">
+          <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
+          <div class="text-white/60">Searching...</div>
+        </div>
+        
+        <!-- Results -->
+        <template v-else>
+          <div v-if="searchResults.length > 0" class="p-4 space-y-2">
+            <div v-for="album in searchResults" 
+                 :key="album.id"
+                 @click="toggleAlbumSelection(album)"
+                 class="flex items-center space-x-3 p-2 rounded-lg hover:bg-white/10 cursor-pointer transition-colors duration-200"
+                 :class="{ 
+                   'bg-white/20': selectedAlbums?.value?.length && selectedAlbums.value.some(a => a.id === album.id),
+                   'opacity-50 cursor-not-allowed': getCurrentAlbums.value?.length && getCurrentAlbums.value.some(a => a.id === album.id)
+                 }">
+              <img :src="album.images[2].url" class="w-12 h-12 rounded" />
+              <div class="flex-1">
+                <div class="text-white font-medium">{{ album.name }}</div>
+                <div class="text-white/60 text-sm">{{ album.artists[0].name }}</div>
+              </div>
+              <div v-if="selectedAlbums?.value?.length && selectedAlbums.value.some(a => a.id === album.id)"
+                   class="text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          
+          <!-- No results message -->
+          <div v-else-if="search" class="p-8 text-center text-white/60">
+            No albums found
+          </div>
+        </template>
+      </div>
+    </Transition>
+    
+    <!-- Search bar with album manager button -->
+    <div id="search-container" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
       <div class="flex items-center space-x-2 bg-black/40 backdrop-blur-xl px-4 py-3 rounded-xl border border-white/20">
+        <button 
+          @click="toggleAlbumManager"
+          class="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl transition-colors duration-200 mr-2"
+          :class="{ 'bg-white/20': showAlbumManager }"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5z" />
+            <path d="M11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+        </button>
         <input 
           type="text" 
           v-model="search" 
           placeholder="Search for an album..." 
           class="bg-transparent border-none outline-none text-white placeholder-white/50 w-64"
-          @keyup.enter="handleSearch"
         />
         <button 
-          @click="handleSearch"
+          v-if="selectedAlbums?.length > 0"
+          @click="addSelectedAlbums"
           class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl transition-colors duration-200"
         >
-          Search
+          Add {{ selectedAlbums?.length }} album{{ selectedAlbums?.length === 1 ? '' : 's' }}
         </button>
       </div>
     </div>
+    
+    <!-- Album manager menu -->
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out"
+      leave-active-class="transition-all duration-200 ease-in"
+      enter-from-class="transform translate-y-4 opacity-0"
+      leave-to-class="transform translate-y-4 opacity-0"
+    >
+      <div v-if="showAlbumManager" 
+           id="album-manager"
+           class="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 w-[500px] max-h-[400px] overflow-y-auto bg-black/40 backdrop-blur-xl rounded-xl border border-white/20">
+        <div class="p-4">
+          <div class="text-white font-medium mb-4">Current Albums</div>
+          <div v-if="getCurrentAlbums.length === 0" class="text-white/60 text-center py-4">
+            No albums added yet
+          </div>
+          <div v-else class="space-y-2">
+            <div v-for="album in getCurrentAlbums" 
+                 :key="album.id"
+                 class="flex items-center space-x-3 p-2 rounded-lg bg-white/5">
+              <img :src="album.images[2].url" class="w-12 h-12 rounded" />
+              <div class="flex-1">
+                <div class="text-white font-medium">{{ album.name }}</div>
+                <div class="text-white/60 text-sm">{{ album.artists[0].name }}</div>
+              </div>
+              <button 
+                @click="removeAlbum(album.id)"
+                class="text-white/60 hover:text-white/90 transition-colors duration-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
     
     <div
       id="zoomable-wrapper"
@@ -375,5 +620,40 @@ input::placeholder {
 
 input {
   font-size: 1rem;
+}
+
+/* Webkit scrollbar styles */
+.overflow-y-auto {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent; /* Firefox */
+}
+
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px 0;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Hide scrollbar when not hovering (optional) */
+.overflow-y-auto:not(:hover)::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Ensure padding for scrollbar */
+.overflow-y-auto {
+  padding-right: 2px;
 }
 </style>
