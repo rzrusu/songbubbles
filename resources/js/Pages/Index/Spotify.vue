@@ -3,7 +3,7 @@ import { ref, onMounted, watch } from 'vue'
 import Layout from '@/Layouts/Layout.vue'
 import { Head, router } from '@inertiajs/vue3'
 import * as d3 from 'd3'
-import ColorThief from 'colorthief'
+import { Vibrant } from "node-vibrant/browser";
 
 // Define props
 const props = defineProps({
@@ -20,28 +20,70 @@ let simulation = null // Store the D3 simulation instance
 let zoom = null // Store the D3 zoom behavior
 let currentTransform = { x: 0, y: 0, k: 1 } // Track current zoom/pan state
 const selectedTrack = ref(null) // Track the currently selected track ID
+const trackColors = ref({}) // Store colors for each track
 
 // Constants for size normalization
 const minSize = 300 // Updated min size
 const maxSize = 800
 const scalingFactor = 3
 
-const processTracks = () => {
+const getVibrantColor = async (imageUrl) => {
+  try {
+    const v = new Vibrant(imageUrl)
+    const palette = await v.getPalette()
+    // Get the base color
+    const baseColor = palette.Vibrant?.hex || 
+                     palette.LightVibrant?.hex || 
+                     palette.DarkVibrant?.hex || 
+                     '#000000'
+    
+    // Convert to RGB to manipulate the color
+    const r = parseInt(baseColor.slice(1,3), 16)
+    const g = parseInt(baseColor.slice(3,5), 16)
+    const b = parseInt(baseColor.slice(5,7), 16)
+    
+    // Desaturate and darken by mixing with black
+    const darkening = 0.4 // Changed from 0.7 to 0.4 for more visible colors
+    const newR = Math.floor(r * (1 - darkening))
+    const newG = Math.floor(g * (1 - darkening))
+    const newB = Math.floor(b * (1 - darkening))
+    
+    // Convert back to hex
+    const newColor = '#' + 
+      (newR.toString(16).padStart(2, '0')) +
+      (newG.toString(16).padStart(2, '0')) +
+      (newB.toString(16).padStart(2, '0'))
+    
+    return newColor
+  } catch (error) {
+    console.error('Error extracting color:', error)
+    return 'rgba(0, 0, 0, 0.5)' // fallback color
+  }
+}
+
+const processTracks = async () => {
   if (!props.tracks || props.tracks.length === 0) return
 
   const { minSize: adjustedMinSize, maxSize: adjustedMaxSize } = adjustSizesForMobile()
-
   const maxPopularity = Math.max(...props.tracks.map(t => t.popularity))
 
+  // Process tracks first
   processedTracks.value = props.tracks.map(track => ({
     ...track,
-    size:
-      adjustedMinSize +
+    size: adjustedMinSize +
       Math.pow((track.popularity / maxPopularity), scalingFactor) *
         (adjustedMaxSize - adjustedMinSize),
     x: window.innerWidth / 2 + (Math.random() - 0.5) * 200,
     y: window.innerHeight / 2 + (Math.random() - 0.5) * 200
   }))
+
+  // Extract colors for all tracks
+  await Promise.all(
+    processedTracks.value.map(async (track) => {
+      const imageUrl = track.album.images[0].url
+      trackColors.value[track.id] = await getVibrantColor(imageUrl)
+    })
+  )
 
   initializeSimulation()
 }
@@ -91,7 +133,7 @@ const initializeZoom = () => {
   const wrapper = d3.select("#zoomable-wrapper")
 
   zoom = d3.zoom()
-    .scaleExtent([0.2, 5]) // Allow zooming out to 0.2x and in to 5x
+    .scaleExtent([0.2, 5])
     .on("zoom", (event) => {
       currentTransform = event.transform
       container.style(
@@ -164,7 +206,7 @@ onMounted(() => {
       class="w-screen h-screen bg-black overflow-hidden relative"
       :class="{ hidden: !initialized }"
     >
-      <!-- Song divs -->
+      <!-- Remove grid container -->
       <div v-if="processedTracks.length === 0" class="text-white text-center">
         No tracks available to display.
       </div>
@@ -177,9 +219,10 @@ onMounted(() => {
             width: track.size + 'px',
             height: track.size * 1.4 + 'px',
             transform: `translate(${track.x - track.size / 2}px, ${track.y - (track.size * 1.5) / 2}px)`,
-            outline: selectedTrack === track.id ? '40px solid rgba(255, 255, 255, 0.1)' : 'none',
+            outline: selectedTrack === track.id ? `40px solid ${trackColors[track.id]}15` : 'none',
+            backgroundColor: trackColors[track.id] ? `${trackColors[track.id]}33` : 'rgba(0, 0, 0, 0.5)',
           }"
-          class="absolute rounded-xl shadow-lg flex bg-black/50 backdrop-blur-lg flex-col items-center text-white text-center p-4 hover:cursor-pointer"
+          class="absolute rounded-xl shadow-lg flex backdrop-blur-lg flex-col items-center text-white text-center p-4 hover:cursor-pointer"
         >
           <div
             :style="{
@@ -192,10 +235,10 @@ onMounted(() => {
             class="rounded-lg"
           ></div>
           <div
-            class="w-full h-full py-4 flex flex-col items-center justify-between"
-            :style="{ height: track.size / 1.4 + 'px' }"
+            class="w-full h-full py-4 flex flex-col items-center"
+            :style="{ height: track.size / 1.2 + 'px' }"
           >
-            <div class="flex flex-col items-center">
+            <div class="flex flex-col items-center h-full justify-center">
               <div
                 class="font-bold truncate-text"
                 :style="{ fontSize: (track.size / 12) + 'px' }"
@@ -214,8 +257,8 @@ onMounted(() => {
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="currentColor"
-                :width="track.size / 6 + 'px'"
-                :height="track.size / 6 + 'px'"
+                :width="track.size / 7 + 'px'"
+                :height="track.size / 7 + 'px'"
               >
                 <path
                   d="M9.195 18.44c1.25.714 2.805-.189 2.805-1.629v-2.34l6.945 3.968c1.25.715 2.805-.188 2.805-1.628V8.69c0-1.44-1.555-2.343-2.805-1.628L12 11.029v-2.34c0-1.44-1.555-2.343-2.805-1.628l-7.108 4.061c-1.26.72-1.26 2.536 0 3.256l7.108 4.061Z"
@@ -225,8 +268,8 @@ onMounted(() => {
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="currentColor"
-                :width="track.size / 6 + 'px'"
-                :height="track.size / 6 + 'px'"
+                :width="track.size / 7 + 'px'"
+                :height="track.size / 7 + 'px'"
               >
                 <path
                   d="M6.75 5.25a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H7.5a.75.75 0 0 1-.75-.75V5.25Zm7.5 0A.75.75 0 0 1 15 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H15a.75.75 0 0 1-.75-.75V5.25Z"
@@ -236,8 +279,8 @@ onMounted(() => {
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="currentColor"
-                :width="track.size / 6 + 'px'"
-                :height="track.size / 6 + 'px'"
+                :width="track.size / 7 + 'px'"
+                :height="track.size / 7 + 'px'"
               >
                 <path
                   d="M5.055 7.06C3.805 6.347 2.25 7.25 2.25 8.69v8.122c0 1.44 1.555 2.343 2.805 1.628L12 14.471v2.34c0 1.44 1.555 2.343 2.805 1.628l7.108-4.061c1.26-.72 1.26-2.536 0-3.256l-7.108-4.061C13.555 6.346 12 7.249 12 8.689v2.34L5.055 7.061Z"
@@ -260,5 +303,9 @@ onMounted(() => {
   text-overflow: ellipsis;
   word-wrap: break-word;
   white-space: normal;
+}
+
+#zoomable-container {
+  transform-origin: 0 0;
 }
 </style>
