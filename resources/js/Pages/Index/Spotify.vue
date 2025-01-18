@@ -31,17 +31,19 @@ const getRandomGray = () => {
   return `rgb(${grayValue}, ${grayValue}, ${grayValue})`
 }
 
-// Function to reprocess tracks when data changes
 const processTracks = () => {
   if (!props.tracks || props.tracks.length === 0) return
+
+  const { minSize: adjustedMinSize, maxSize: adjustedMaxSize } = adjustSizesForMobile()
 
   const maxPopularity = Math.max(...props.tracks.map(t => t.popularity))
 
   processedTracks.value = props.tracks.map(track => ({
     ...track,
     size:
-      minSize +
-      Math.pow((track.popularity / maxPopularity), scalingFactor) * (maxSize - minSize),
+      adjustedMinSize +
+      Math.pow((track.popularity / maxPopularity), scalingFactor) *
+        (adjustedMaxSize - adjustedMinSize),
     color: getRandomGray(),
     x: window.innerWidth / 2 + (Math.random() - 0.5) * 200,
     y: window.innerHeight / 2 + (Math.random() - 0.5) * 200
@@ -95,25 +97,49 @@ const initializeZoom = () => {
   const wrapper = d3.select("#zoomable-wrapper")
 
   zoom = d3.zoom()
-    .scaleExtent([0.2, 5])
+    .scaleExtent([0.2, 5]) // Allow zooming out to 0.2x and in to 5x
     .on("zoom", (event) => {
       currentTransform = event.transform
-      container.style("transform", `translate(${event.transform.x}px, ${event.transform.y}px) scale(${event.transform.k})`)
+      container.style(
+        "transform",
+        `translate(${event.transform.x}px, ${event.transform.y}px) scale(${event.transform.k})`
+      )
     })
 
   wrapper.call(zoom)
 
-  const initialScale = 0.3
-  const translateX = (window.innerWidth - window.innerWidth * initialScale) / 2
-  const translateY = (window.innerHeight - window.innerHeight * initialScale) / 2
+  const initialScale = 0.5 // Larger scale for smaller screens
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
 
-  wrapper.call(
-    zoom.transform,
-    d3.zoomIdentity.translate(translateX, translateY).scale(initialScale)
-  )
+  // Adjust centering dynamically
+  const translateX = (viewportWidth - viewportWidth * initialScale) / 2
+  const translateY = (viewportHeight - viewportHeight * initialScale) / 2
+
+  // Smooth zoom transition with easing
+  wrapper
+    .transition()
+    .duration(500) // Faster transition for mobile
+    .ease(d3.easeCubicOut)
+    .call(
+      zoom.transform,
+      d3.zoomIdentity.translate(translateX, translateY).scale(initialScale)
+    )
 
   currentTransform = { x: translateX, y: translateY, k: initialScale }
 }
+
+// Adjust min and max size for mobile screens
+const adjustSizesForMobile = () => {
+  const isMobile = window.innerWidth < 768
+  const scaleFactor = isMobile ? 0.6 : 1 // Reduce size for mobile
+
+  return {
+    minSize: minSize * scaleFactor,
+    maxSize: maxSize * scaleFactor,
+  }
+}
+
 
 watch(() => props.tracks, processTracks, { immediate: true })
 
