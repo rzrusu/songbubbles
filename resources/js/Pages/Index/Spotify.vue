@@ -3,6 +3,7 @@ import { ref, onMounted, watch } from 'vue'
 import Layout from '@/Layouts/Layout.vue'
 import { Head, router } from '@inertiajs/vue3'
 import * as d3 from 'd3'
+import ColorThief from 'colorthief'
 
 // Define props
 const props = defineProps({
@@ -25,12 +26,6 @@ const minSize = 300 // Updated min size
 const maxSize = 800
 const scalingFactor = 3
 
-// Helper function to generate a random gray color
-const getRandomGray = () => {
-  const grayValue = Math.floor(Math.random() * 156) + 50
-  return `rgb(${grayValue}, ${grayValue}, ${grayValue})`
-}
-
 const processTracks = () => {
   if (!props.tracks || props.tracks.length === 0) return
 
@@ -44,7 +39,6 @@ const processTracks = () => {
       adjustedMinSize +
       Math.pow((track.popularity / maxPopularity), scalingFactor) *
         (adjustedMaxSize - adjustedMinSize),
-    color: getRandomGray(),
     x: window.innerWidth / 2 + (Math.random() - 0.5) * 200,
     y: window.innerHeight / 2 + (Math.random() - 0.5) * 200
   }))
@@ -140,7 +134,6 @@ const adjustSizesForMobile = () => {
   }
 }
 
-
 watch(() => props.tracks, processTracks, { immediate: true })
 
 const searchSpotify = () => {
@@ -169,8 +162,9 @@ onMounted(() => {
     <div
       id="zoomable-wrapper"
       class="w-screen h-screen bg-black overflow-hidden relative"
-      :class="{ hidden: !initialized }" 
+      :class="{ hidden: !initialized }"
     >
+      <!-- Song divs -->
       <div v-if="processedTracks.length === 0" class="text-white text-center">
         No tracks available to display.
       </div>
@@ -178,33 +172,77 @@ onMounted(() => {
         <div
           v-for="track in processedTracks"
           :key="track.id || track.name"
-          @click="bringToFront(track.id)" 
-          :style="{ 
+          @click="bringToFront(track.id)"
+          :style="{
             width: track.size + 'px',
-            height: track.size + 'px',
-            transform: `translate(${track.x - track.size / 2}px, ${track.y - track.size / 2}px)`,
-            backgroundColor: track.color,
-            backgroundImage: `url(${track.album.images[0].url})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            outline: selectedTrack === track.id ? '40px solid rgba(255, 255, 255, 0.1)' : 'none' // Add border if selected
+            height: track.size * 1.4 + 'px',
+            transform: `translate(${track.x - track.size / 2}px, ${track.y - (track.size * 1.5) / 2}px)`,
+            outline: selectedTrack === track.id ? '40px solid rgba(255, 255, 255, 0.1)' : 'none',
           }"
-          class="absolute rounded-lg shadow-lg flex flex-col items-center justify-end text-white text-center p-4 hover:cursor-pointer"
+          class="absolute rounded-xl shadow-lg flex bg-black/50 backdrop-blur-lg flex-col items-center text-white text-center p-4 hover:cursor-pointer"
         >
-          <div 
-            class="backdrop-blur-sm bg-black/60 w-full rounded-lg p-2"
+          <div
+            :style="{
+              backgroundImage: `url(${track.album.images[0].url})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              width: '100%',
+              height: '100%',
+            }"
+            class="rounded-lg"
+          ></div>
+          <div
+            class="w-full h-full py-4 flex flex-col items-center justify-between"
+            :style="{ height: track.size / 1.4 + 'px' }"
           >
-            <div 
-              class="font-bold truncate-text"
-              :style="{ fontSize: (track.size / 12) + 'px' }" 
-            >
-              {{ track.name }}
+            <div class="flex flex-col items-center">
+              <div
+                class="font-bold truncate-text"
+                :style="{ fontSize: (track.size / 12) + 'px' }"
+              >
+                {{ track.name }}
+              </div>
+              <div
+                class="truncate-text text-gray-300"
+                :style="{ fontSize: (track.size / 14) + 'px' }"
+              >
+                {{ track.artists.map(artist => artist.name).join(', ') }}
+              </div>
             </div>
-            <div 
-              class="text-gray-300 mt-1"
-              :style="{ fontSize: (track.size / 16) + 'px' }" 
-            >
-              {{ track.popularity }}
+            <div class="flex flex-row items-center space-x-4">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                :width="track.size / 6 + 'px'"
+                :height="track.size / 6 + 'px'"
+              >
+                <path
+                  d="M9.195 18.44c1.25.714 2.805-.189 2.805-1.629v-2.34l6.945 3.968c1.25.715 2.805-.188 2.805-1.628V8.69c0-1.44-1.555-2.343-2.805-1.628L12 11.029v-2.34c0-1.44-1.555-2.343-2.805-1.628l-7.108 4.061c-1.26.72-1.26 2.536 0 3.256l7.108 4.061Z"
+                />
+              </svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                :width="track.size / 6 + 'px'"
+                :height="track.size / 6 + 'px'"
+              >
+                <path
+                  d="M6.75 5.25a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H7.5a.75.75 0 0 1-.75-.75V5.25Zm7.5 0A.75.75 0 0 1 15 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H15a.75.75 0 0 1-.75-.75V5.25Z"
+                />
+              </svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                :width="track.size / 6 + 'px'"
+                :height="track.size / 6 + 'px'"
+              >
+                <path
+                  d="M5.055 7.06C3.805 6.347 2.25 7.25 2.25 8.69v8.122c0 1.44 1.555 2.343 2.805 1.628L12 14.471v2.34c0 1.44 1.555 2.343 2.805 1.628l7.108-4.061c1.26-.72 1.26-2.536 0-3.256l-7.108-4.061C13.555 6.346 12 7.249 12 8.689v2.34L5.055 7.061Z"
+                />
+              </svg>
             </div>
           </div>
         </div>
@@ -216,7 +254,7 @@ onMounted(() => {
 <style scoped>
 .truncate-text {
   display: -webkit-box;
-  -webkit-line-clamp: 2; /* Limit to 2 lines */
+  -webkit-line-clamp: 1; /* Limit to 2 lines */
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -17,6 +17,8 @@
     "dependencies": {
         "@inertiajs/vue3": "^2.0.0",
         "@vitejs/plugin-vue": "^5.2.1",
-        "d3": "^7.9.0"
+        "colorthief": "^2.6.0",
+        "d3": "^7.9.0",
+        "node-vibrant": "^4.0.3"
     }
 }
