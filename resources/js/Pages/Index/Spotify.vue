@@ -493,7 +493,7 @@ onUnmounted(() => {
     
     <div
       id="zoomable-wrapper"
-      class="w-screen h-screen bg-black overflow-hidden relative"
+      class="w-screen h-screen bg-[#030507] overflow-hidden relative"
       :class="{ hidden: !initialized }"
     >
       <div v-if="processedTracks.length === 0" class="text-white text-center">
