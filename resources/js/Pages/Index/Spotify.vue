@@ -254,26 +254,26 @@ watch(search, (newValue) => {
 
 // Handle album selection
 const toggleAlbumSelection = (album) => {
-  if (!selectedAlbums.value) {
-    selectedAlbums.value = []
-  }
+  console.log('Before toggle:', selectedAlbums.value) // Debug log
   
   const index = selectedAlbums.value.findIndex(a => a.id === album.id)
   if (index === -1) {
-    // Check if adding this album would exceed the limit
     if (getCurrentAlbums.value.length + selectedAlbums.value.length >= MAX_ALBUMS) {
       alert('Maximum of 5 albums allowed')
       return
     }
-    // Check if album is already in current tracks
     if (getCurrentAlbums.value.some(a => a.id === album.id)) {
       alert('This album is already in your selection')
       return
     }
-    selectedAlbums.value.push(album)
+    // Create a new array to ensure reactivity
+    selectedAlbums.value = [...selectedAlbums.value, album]
   } else {
-    selectedAlbums.value.splice(index, 1)
+    // Create a new array to ensure reactivity
+    selectedAlbums.value = selectedAlbums.value.filter(a => a.id !== album.id)
   }
+  
+  console.log('After toggle:', selectedAlbums.value) // Debug log
 }
 
 // Add selected albums to visualization
@@ -351,6 +351,19 @@ const closeMenus = (event) => {
   showAlbumManager.value = false
 }
 
+// Add a watcher to debug
+watch(selectedAlbums, (newVal) => {
+  console.log('selectedAlbums changed:', newVal)
+}, { deep: true })
+
+// Add computed property for checking selected status
+const isAlbumSelected = (albumId) => {
+  return selectedAlbums.value?.some(album => album.id === albumId)
+}
+
+// Add computed for selected albums count
+const selectedCount = computed(() => selectedAlbums.value.length)
+
 onMounted(() => {
   window.addEventListener("wheel", (event) => event.preventDefault(), { passive: false })
   processTracks()
@@ -399,15 +412,15 @@ onUnmounted(() => {
                  @click="toggleAlbumSelection(album)"
                  class="flex items-center space-x-3 p-2 rounded-lg hover:bg-white/10 cursor-pointer transition-colors duration-200"
                  :class="{ 
-                   'bg-white/20': selectedAlbums?.value?.length && selectedAlbums.value.some(a => a.id === album.id),
-                   'opacity-50 cursor-not-allowed': getCurrentAlbums.value?.length && getCurrentAlbums.value.some(a => a.id === album.id)
+                   'bg-white/20': isAlbumSelected(album.id),
+                   'opacity-50 cursor-not-allowed': getCurrentAlbums.value?.some(a => a.id === album.id)
                  }">
               <img :src="album.images[2].url" class="w-12 h-12 rounded" />
               <div class="flex-1">
                 <div class="text-white font-medium">{{ album.name }}</div>
                 <div class="text-white/60 text-sm">{{ album.artists[0].name }}</div>
               </div>
-              <div v-if="selectedAlbums?.value?.length && selectedAlbums.value.some(a => a.id === album.id)"
+              <div v-show="isAlbumSelected(album.id)"
                    class="text-white">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -434,11 +447,11 @@ onUnmounted(() => {
           class="bg-transparent border-none outline-none text-white placeholder-white/50 w-64"
         />
         <button 
-          v-if="selectedAlbums.value?.length > 0"
+          v-show="selectedCount > 0"
           @click="addSelectedAlbums"
           class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl transition-colors duration-200"
         >
-          Add {{ selectedAlbums.value.length }} album{{ selectedAlbums.value.length === 1 ? '' : 's' }}
+          Add {{ selectedCount }} album{{ selectedCount === 1 ? '' : 's' }}
         </button>
         <button 
           @click="toggleAlbumManager"
