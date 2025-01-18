@@ -214,11 +214,26 @@ onMounted(() => {
 
 <template>
   <Layout>
-    <div class="absolute top-0 left-0 bg-red-500 m-4 z-50">
-      <input type="text" v-model="search" placeholder="Search" />
-      <button @click="handleSearch">Search</button>
-    </div>
     <Head title="Spotify" />
+    
+    <!-- Move search to bottom center and style it -->
+    <div class="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+      <div class="flex items-center space-x-2 bg-black/40 backdrop-blur-xl px-4 py-3 rounded-xl border border-white/20">
+        <input 
+          type="text" 
+          v-model="search" 
+          placeholder="Search for an album..." 
+          class="bg-transparent border-none outline-none text-white placeholder-white/50 w-64"
+          @keyup.enter="handleSearch"
+        />
+        <button 
+          @click="handleSearch"
+          class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl transition-colors duration-200"
+        >
+          Search
+        </button>
+      </div>
+    </div>
     
     <div
       id="zoomable-wrapper"
@@ -352,5 +367,13 @@ onMounted(() => {
   background: rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+}
+
+input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+input {
+  font-size: 1rem;
 }
 </style>
