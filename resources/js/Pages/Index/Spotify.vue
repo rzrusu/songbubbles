@@ -21,20 +21,21 @@ let zoom = null // Store the D3 zoom behavior
 let currentTransform = { x: 0, y: 0, k: 1 } // Track current zoom/pan state
 const selectedTrack = ref(null) // Track the currently selected track ID
 const trackColors = ref({}) // Store colors for each track
+const isLoading = ref(true)
 
 // Constants for size normalization
 const minSize = 300 // Updated min size
 const maxSize = 800
-const scalingFactor = 3
+const scalingFactor = 5
 
 const getVibrantColor = async (imageUrl) => {
   try {
     const v = new Vibrant(imageUrl)
     const palette = await v.getPalette()
-    // Get the base color
-    const baseColor = palette.Vibrant?.hex || 
-                     palette.LightVibrant?.hex || 
-                     palette.DarkVibrant?.hex || 
+    // Get the base color, preferring DarkVibrant
+    const baseColor = palette.DarkVibrant?.hex || 
+                     palette.Vibrant?.hex || 
+                     palette.DarkMuted?.hex || 
                      '#000000'
     
     // Convert to RGB to manipulate the color
@@ -43,7 +44,7 @@ const getVibrantColor = async (imageUrl) => {
     const b = parseInt(baseColor.slice(5,7), 16)
     
     // Desaturate and darken by mixing with black
-    const darkening = 0.4 // Changed from 0.7 to 0.4 for more visible colors
+    const darkening = 0.4 // You might want to adjust this for DarkVibrant colors
     const newR = Math.floor(r * (1 - darkening))
     const newG = Math.floor(g * (1 - darkening))
     const newB = Math.floor(b * (1 - darkening))
@@ -62,12 +63,15 @@ const getVibrantColor = async (imageUrl) => {
 }
 
 const processTracks = async () => {
-  if (!props.tracks || props.tracks.length === 0) return
+  if (!props.tracks || props.tracks.length === 0) {
+    isLoading.value = false
+    return
+  }
 
   const { minSize: adjustedMinSize, maxSize: adjustedMaxSize } = adjustSizesForMobile()
   const maxPopularity = Math.max(...props.tracks.map(t => t.popularity))
 
-  // Process tracks first
+  // Set up initial positions and process tracks
   processedTracks.value = props.tracks.map(track => ({
     ...track,
     size: adjustedMinSize +
@@ -77,7 +81,7 @@ const processTracks = async () => {
     y: window.innerHeight / 2 + (Math.random() - 0.5) * 200
   }))
 
-  // Extract colors for all tracks
+  // Process colors first
   await Promise.all(
     processedTracks.value.map(async (track) => {
       const imageUrl = track.album.images[0].url
@@ -85,6 +89,10 @@ const processTracks = async () => {
     })
   )
 
+  // Remove loading screen before starting simulation
+  isLoading.value = false
+  
+  // Initialize simulation after loading screen is gone
   initializeSimulation()
 }
 
@@ -96,7 +104,7 @@ const initializeSimulation = () => {
     .alphaDecay(0.001)
     .velocityDecay(0.6)
     .force('center', d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2))
-    .force('collision', d3.forceCollide(d => d.size / 2 + 40))
+    .force('collision', d3.forceCollide(d => d.size / 2 + 80))
     .force('charge', d3.forceManyBody().strength(-200))
     .force('x', d3.forceX(window.innerWidth / 2).strength(0.05))
     .force('y', d3.forceY(window.innerHeight / 2).strength(0.05))
@@ -178,13 +186,23 @@ const adjustSizesForMobile = () => {
 
 watch(() => props.tracks, processTracks, { immediate: true })
 
-const searchSpotify = () => {
+const handleSearch = () => {
   if (!search.value) {
     alert('Please enter a search query.')
     return
   }
-
-  router.post('/search', { query: search.value }, { preserveState: true })
+  
+  isLoading.value = true
+  router.post('/search', { 
+    query: search.value 
+  }, {
+    preserveState: true,
+    onSuccess: () => {
+      setTimeout(() => {
+        isLoading.value = false
+      }, 1500)
+    }
+  })
 }
 
 onMounted(() => {
@@ -198,15 +216,15 @@ onMounted(() => {
   <Layout>
     <div class="absolute top-0 left-0 bg-red-500 m-4 z-50">
       <input type="text" v-model="search" placeholder="Search" />
-      <button @click="searchSpotify">Search</button>
+      <button @click="handleSearch">Search</button>
     </div>
     <Head title="Spotify" />
+    
     <div
       id="zoomable-wrapper"
       class="w-screen h-screen bg-black overflow-hidden relative"
       :class="{ hidden: !initialized }"
     >
-      <!-- Remove grid container -->
       <div v-if="processedTracks.length === 0" class="text-white text-center">
         No tracks available to display.
       </div>
@@ -222,7 +240,7 @@ onMounted(() => {
             outline: selectedTrack === track.id ? `40px solid ${trackColors[track.id]}15` : 'none',
             backgroundColor: trackColors[track.id] ? `${trackColors[track.id]}33` : 'rgba(0, 0, 0, 0.5)',
           }"
-          class="absolute rounded-xl shadow-lg flex backdrop-blur-lg flex-col items-center text-white text-center p-4 hover:cursor-pointer"
+          class="absolute rounded-xl shadow-lg flex backdrop-blur-xl flex-col items-center text-white text-center p-4 hover:cursor-pointer"
         >
           <div
             :style="{
@@ -241,7 +259,7 @@ onMounted(() => {
             <div class="flex flex-col items-center h-full justify-center">
               <div
                 class="font-bold truncate-text"
-                :style="{ fontSize: (track.size / 12) + 'px' }"
+                :style="{ fontSize: (track.size / 10) + 'px' }"
               >
                 {{ track.name }}
               </div>
@@ -290,6 +308,22 @@ onMounted(() => {
           </div>
         </div>
       </div>
+      
+      <!-- Loading overlay with blur -->
+      <Transition
+        enter-active-class="transition-opacity duration-500"
+        leave-active-class="transition-opacity duration-500"
+        enter-from-class="opacity-0"
+        leave-to-class="opacity-0"
+      >
+        <div v-if="isLoading" 
+             class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xl">
+          <div class="text-center space-y-4">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto"></div>
+            <div class="text-white text-xl font-medium">Arranging your music...</div>
+          </div>
+        </div>
+      </Transition>
     </div>
   </Layout>
 </template>
@@ -307,5 +341,16 @@ onMounted(() => {
 
 #zoomable-container {
   transform-origin: 0 0;
+}
+
+.backdrop-blur-xl {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.loading-overlay {
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 </style>
