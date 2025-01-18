@@ -377,7 +377,7 @@ onUnmounted(() => {
     >
       <div v-if="showResults" 
            id="search-results"
-           class="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 w-[500px] max-h-[400px] overflow-y-auto bg-black/40 backdrop-blur-xl rounded-xl border border-white/20">
+           class="fixed bottom-28 left-1/2 transform -translate-x-1/2 z-50 w-[500px] max-h-[400px] overflow-y-auto bg-black/40 backdrop-blur-xl rounded-xl border border-white/20">
         <!-- Add album limit indicator -->
         <div class="px-4 pt-3 pb-2 border-b border-white/10">
           <div class="text-white/60 text-sm">
@@ -427,16 +427,6 @@ onUnmounted(() => {
     <!-- Search bar with album manager button -->
     <div id="search-container" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
       <div class="flex items-center space-x-2 bg-black/40 backdrop-blur-xl px-4 py-3 rounded-xl border border-white/20">
-        <button 
-          @click="toggleAlbumManager"
-          class="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl transition-colors duration-200 mr-2"
-          :class="{ 'bg-white/20': showAlbumManager }"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5z" />
-            <path d="M11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-          </svg>
-        </button>
         <input 
           type="text" 
           v-model="search" 
@@ -444,11 +434,21 @@ onUnmounted(() => {
           class="bg-transparent border-none outline-none text-white placeholder-white/50 w-64"
         />
         <button 
-          v-if="selectedAlbums?.length > 0"
+          v-if="selectedAlbums.value?.length > 0"
           @click="addSelectedAlbums"
           class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl transition-colors duration-200"
         >
-          Add {{ selectedAlbums?.length }} album{{ selectedAlbums?.length === 1 ? '' : 's' }}
+          Add {{ selectedAlbums.value.length }} album{{ selectedAlbums.value.length === 1 ? '' : 's' }}
+        </button>
+        <button 
+          @click="toggleAlbumManager"
+          class="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl transition-colors duration-200"
+          :class="{ 'bg-white/20': showAlbumManager }"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5z" />
+            <path d="M11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
         </button>
       </div>
     </div>
@@ -462,7 +462,7 @@ onUnmounted(() => {
     >
       <div v-if="showAlbumManager" 
            id="album-manager"
-           class="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 w-[500px] max-h-[400px] overflow-y-auto bg-black/40 backdrop-blur-xl rounded-xl border border-white/20">
+           class="fixed bottom-28 left-1/2 transform -translate-x-1/2 z-50 w-[500px] max-h-[400px] overflow-y-auto bg-black/40 backdrop-blur-xl rounded-xl border border-white/20">
         <div class="p-4">
           <div class="text-white font-medium mb-4">Current Albums</div>
           <div v-if="getCurrentAlbums.length === 0" class="text-white/60 text-center py-4">
