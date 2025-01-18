@@ -296,6 +296,14 @@ const addSelectedAlbums = () => {
 const removeAlbum = (albumId) => {
   // Filter out tracks from the specified album
   processedTracks.value = processedTracks.value.filter(track => track.album.id !== albumId)
+  
+  // Only close menu if no albums left
+  if (getCurrentAlbums.value.length === 0) {
+    showAlbumManager.value = false
+  } else {
+    showAlbumManager.value = true // Explicitly keep menu open
+  }
+  
   // Restart simulation
   initializeSimulation()
 }
@@ -332,12 +340,15 @@ const closeMenus = (event) => {
   const albumManager = document.querySelector('#album-manager')
   const searchResults = document.querySelector('#search-results')
   
-  if (!searchContainer?.contains(event.target) && 
-      !albumManager?.contains(event.target) && 
-      !searchResults?.contains(event.target)) {
-    showResults.value = false
-    showAlbumManager.value = false
+  // Don't close if clicking inside any of these elements
+  if (searchContainer?.contains(event.target) || 
+      albumManager?.contains(event.target) || 
+      searchResults?.contains(event.target)) {
+    return
   }
+  
+  showResults.value = false
+  showAlbumManager.value = false
 }
 
 onMounted(() => {
@@ -467,7 +478,7 @@ onUnmounted(() => {
                 <div class="text-white/60 text-sm">{{ album.artists[0].name }}</div>
               </div>
               <button 
-                @click="removeAlbum(album.id)"
+                @click.stop="removeAlbum(album.id)"
                 class="text-white/60 hover:text-white/90 transition-colors duration-200"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
