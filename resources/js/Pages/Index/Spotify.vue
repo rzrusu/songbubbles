@@ -1,6 +1,5 @@
 <script setup>
 import { ref, onMounted, watch, computed, onUnmounted } from 'vue'
-import Layout from '@/Layouts/Layout.vue'
 import { Head, router } from '@inertiajs/vue3'
 import * as d3 from 'd3'
 import { Vibrant } from "node-vibrant/browser";
@@ -33,18 +32,18 @@ const isLoading = ref(true)
 const processedTracks = ref([])
 const initialized = ref(false)
 
-// Constants for size normalization
-const minSize = 300 // Updated min size
+// Constants for track sizes
+const minSize = 300
 const maxSize = 800
 const scalingFactor = 5
 
-// Add loading state for search
+// Loading state for search
 const isSearching = ref(false)
 
-// Add state for showing album management menu
+// State for showing album management menu
 const showAlbumManager = ref(false)
 
-// Add constant for max albums
+// Nr of max albums
 const MAX_ALBUMS = 5
 
 const getVibrantColor = async (imageUrl) => {
@@ -57,13 +56,13 @@ const getVibrantColor = async (imageUrl) => {
                      palette.DarkMuted?.hex || 
                      '#000000'
     
-    // Convert to RGB to manipulate the color
+    // Convert to RGB
     const r = parseInt(baseColor.slice(1,3), 16)
     const g = parseInt(baseColor.slice(3,5), 16)
     const b = parseInt(baseColor.slice(5,7), 16)
     
     // Desaturate and darken by mixing with black
-    const darkening = 0.4 // You might want to adjust this for DarkVibrant colors
+    const darkening = 0.4
     const newR = Math.floor(r * (1 - darkening))
     const newG = Math.floor(g * (1 - darkening))
     const newB = Math.floor(b * (1 - darkening))
@@ -111,11 +110,10 @@ const processTracks = async () => {
   // Remove loading screen before starting simulation
   isLoading.value = false
   
-  // Initialize simulation after loading screen is gone
   initializeSimulation()
 }
 
-// Function to initialize or restart the D3 simulation
+// Function to initialize or restart the simulation
 const initializeSimulation = () => {
   if (simulation) simulation.stop()
 
@@ -137,6 +135,7 @@ const initializeSimulation = () => {
 }
 
 // Function to shift elements dynamically when a song is clicked
+// This is what generates the sort of gravitational push effect
 const bringToFront = (trackId) => {
   selectedTrack.value = trackId
   const selected = processedTracks.value.find(t => t.id === trackId)
@@ -179,10 +178,9 @@ const initializeZoom = () => {
   const translateX = (viewportWidth - viewportWidth * initialScale) / 2
   const translateY = (viewportHeight - viewportHeight * initialScale) / 2
 
-  // Smooth zoom transition with easing
   wrapper
     .transition()
-    .duration(500) // Faster transition for mobile
+    .duration(500)
     .ease(d3.easeCubicOut)
     .call(
       zoom.transform,
@@ -192,7 +190,7 @@ const initializeZoom = () => {
   currentTransform = { x: translateX, y: translateY, k: initialScale }
 }
 
-// Adjust min and max size for mobile screens
+// Dynamically adjust track sizes for mobile
 const adjustSizesForMobile = () => {
   const isMobile = window.innerWidth < 768
   const scaleFactor = isMobile ? 0.6 : 1 // Reduce size for mobile
@@ -604,7 +602,7 @@ onUnmounted(() => {
              class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xl">
           <div class="text-center space-y-4">
             <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto"></div>
-            <div class="text-white text-xl font-medium">Arranging your music...</div>
+            <div class="text-white text-xl font-medium">Grabbing your music...</div>
           </div>
         </div>
       </Transition>
@@ -612,72 +610,4 @@ onUnmounted(() => {
   </Layout>
 </template>
 
-<style scoped>
-.truncate-text {
-  display: -webkit-box;
-  -webkit-line-clamp: 1; /* Limit to 2 lines */
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  word-wrap: break-word;
-  white-space: normal;
-}
-
-#zoomable-container {
-  transform-origin: 0 0;
-}
-
-.backdrop-blur-xl {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-.loading-overlay {
-  background: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-input {
-  font-size: 1rem;
-}
-
-/* Webkit scrollbar styles */
-.overflow-y-auto {
-  scrollbar-width: thin; /* Firefox */
-  scrollbar-color: rgba(255, 255, 255, 0.3) transparent; /* Firefox */
-}
-
-.overflow-y-auto::-webkit-scrollbar {
-  width: 6px;
-}
-
-.overflow-y-auto::-webkit-scrollbar-track {
-  background: transparent;
-  margin: 4px 0;
-}
-
-.overflow-y-auto::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-  transition: background-color 0.2s;
-}
-
-.overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.5);
-}
-
-/* Hide scrollbar when not hovering (optional) */
-.overflow-y-auto:not(:hover)::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-/* Ensure padding for scrollbar */
-.overflow-y-auto {
-  padding-right: 2px;
-}
-</style>
+<style src="./resources/js/Pages/Index/styles/style.css" scoped />
