@@ -12,7 +12,7 @@ class SpotifyController extends Controller
     public function index()
     {
         // Get or cache daily featured albums
-        $tracks_array = Cache::remember('daily_featured_tracks', 86400, function () {
+        $tracks_array = Cache::remember('daily_featured_tracks', 43200, function () {
             try {
                 $tracks_array = [];
                 
