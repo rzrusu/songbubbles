@@ -40,7 +40,7 @@ class SpotifyController extends Controller
             }
         });
 
-        return Inertia::render('Index/Spotify', [
+        return Inertia::render('Index/Index', [
             'tracks' => $tracks_array
         ]);
     }
@@ -75,7 +75,7 @@ class SpotifyController extends Controller
         }
 
         // Send the new tracks to the frontend
-        return Inertia::render('Index/Spotify', [
+        return Inertia::render('Index/Index', [
             'tracks' => $tracks_array
         ]);
     }
@@ -86,7 +86,7 @@ class SpotifyController extends Controller
         $currentTracks = $request->input('currentTracks', []);
 
         if (!$query) {
-            return Inertia::render('Index/Spotify', [
+            return Inertia::render('Index/Index', [
                 'tracks' => $currentTracks,
                 'results' => []
             ]);
@@ -95,7 +95,7 @@ class SpotifyController extends Controller
         // Search albums by query
         $albums = Spotify::searchAlbums($query)->get();
 
-        return Inertia::render('Index/Spotify', [
+        return Inertia::render('Index/Index', [
             'tracks' => $currentTracks,
             'results' => $albums['albums']['items'] ?? []
         ]);
@@ -124,7 +124,7 @@ class SpotifyController extends Controller
         $all_tracks = array_merge($current_tracks, $new_tracks);
 
         // Return to the view with all tracks
-        return Inertia::render('Index/Spotify', [
+        return Inertia::render('Index/Index', [
             'tracks' => $all_tracks
         ]);
     }
