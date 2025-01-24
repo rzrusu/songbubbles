@@ -378,6 +378,24 @@ onUnmounted(() => {
 <template>
   <Layout>
     <Head title="Spotify" />
+
+    <!-- View Switcher (future feature) -->
+    <div class="fixed top-8 left-1/2 -translate-x-1/2 z-50">
+      <div class="bg-black/40 backdrop-blur-xl rounded-full border border-white/20 p-1">
+        <div class="relative flex">
+          <button class="relative z-10 w-40 px-4 py-2 text-sm text-white transition-colors duration-200 rounded-full flex items-center justify-center">
+            Song Bubbles
+          </button>
+          <button class="relative z-10 w-40 px-4 py-2 text-sm text-white/20 transition-colors duration-200 rounded-full cursor-not-allowed group flex items-center justify-center"
+                  disabled>
+            Artist Connections
+            <span class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs text-white/40 bg-black/80 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200">Coming Soon</span>
+          </button>
+          <!-- Animated background pill -->
+          <div class="absolute left-0 top-0 h-full w-1/2 bg-white/10 rounded-full transition-all duration-300 ease-in-out"></div>
+        </div>
+      </div>
+    </div>
     
     <!-- Search results dropdown with loading state -->
     <Transition
