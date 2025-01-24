@@ -9,6 +9,7 @@ const selectedAlbums = ref([])
 const searchResults = ref([])
 const showResults = ref(false)
 const search = ref('')
+const showInfo = ref(false)
 
 // Define props
 const props = defineProps({
@@ -380,22 +381,25 @@ const toggleAlbumManager = () => {
   }
 }
 
-// Add click outside handler
+// Update click outside handler
 const closeMenus = (event) => {
-  // Check if click is outside both menus and the search bar
+  // Check if click is outside all menus and the search bar
   const searchContainer = document.querySelector('#search-container')
   const albumManager = document.querySelector('#album-manager')
   const searchResults = document.querySelector('#search-results')
+  const infoMenu = document.querySelector('#info-menu')
   
   // Don't close if clicking inside any of these elements
   if (searchContainer?.contains(event.target) || 
       albumManager?.contains(event.target) || 
-      searchResults?.contains(event.target)) {
+      searchResults?.contains(event.target) ||
+      infoMenu?.contains(event.target)) {
     return
   }
   
   showResults.value = false
   showAlbumManager.value = false
+  showInfo.value = false
 }
 
 // Add a watcher to debug
@@ -504,33 +508,78 @@ onUnmounted(() => {
     
     <!-- Search bar with album manager button -->
     <div id="search-container" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
-      <div class="flex items-center space-x-2 bg-black/40 backdrop-blur-xl px-4 py-3 rounded-xl border border-white/20">
-        <input 
-          type="text" 
-          v-model="search" 
-          placeholder="Search for an album..." 
-          class="bg-transparent border-none outline-none text-white placeholder-white/50 w-64"
-        />
+      <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-2 bg-black/40 backdrop-blur-xl px-4 py-3 rounded-xl border border-white/20">
+          <input 
+            type="text" 
+            v-model="search" 
+            placeholder="Search for an album..." 
+            class="bg-transparent border-none outline-none text-white placeholder-white/50 w-64"
+          />
+          <button 
+            v-show="selectedCount > 0"
+            @click="addSelectedAlbums"
+            class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl transition-colors duration-200"
+          >
+            Add {{ selectedCount }} album{{ selectedCount === 1 ? '' : 's' }}
+          </button>
+          <button 
+            @click="toggleAlbumManager"
+            class="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl transition-colors duration-200"
+            :class="{ 'bg-white/20': showAlbumManager }"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5z" />
+              <path d="M11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Info button -->
         <button 
-          v-show="selectedCount > 0"
-          @click="addSelectedAlbums"
-          class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl transition-colors duration-200"
-        >
-          Add {{ selectedCount }} album{{ selectedCount === 1 ? '' : 's' }}
-        </button>
-        <button 
-          @click="toggleAlbumManager"
+          @click="showInfo = !showInfo"
           class="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl transition-colors duration-200"
-          :class="{ 'bg-white/20': showAlbumManager }"
+          :class="{ 'bg-white/20': showInfo }"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5z" />
-            <path d="M11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
           </svg>
         </button>
       </div>
+
+      <!-- Info menu -->
+      <Transition
+        enter-active-class="transition-all duration-300 ease-out"
+        leave-active-class="transition-all duration-200 ease-in"
+        enter-from-class="transform translate-y-4 opacity-0"
+        leave-to-class="transform translate-y-4 opacity-0"
+      >
+        <div v-if="showInfo"
+             id="info-menu"
+             class="fixed bottom-28 left-1/2 transform -translate-x-1/2 z-50 w-[500px] bg-black/40 backdrop-blur-xl rounded-xl border border-white/20 p-6">
+          <h3 class="text-white font-medium text-lg mb-4">About This Project</h3>
+          <div class="space-y-4 text-white/80">
+            <p>
+              This is an interactive visualization of Spotify music albums. Each bubble represents a track from an album, with its size corresponding to it's popularity. Bigger tracks are more popular.
+            </p>
+            <p>
+              You can:
+            </p>
+            <ul class="list-disc list-inside space-y-2 ml-2">
+              <li>Zoom in/out and pan around using your mouse or touchpad</li>
+              <li>Click on any bubble to focus on it</li>
+              <li>Search and add albums using the search bar below</li>
+              <li>Manage your selected albums using the grid button</li>
+            </ul>
+            <h3 class="text-white font-medium text-lg mb-4">Found a bug?</h3>
+            <p>
+              Shoot me an email <b>(rzrusu03@gmail.com)</b> or a message on discord <b>(rusuu)</b>.
+            </p>
+            <p>Created by <a href="https://github.com/rzrusu" class="text-white hover:text-white/80 transition-colors duration-200">Razvan Rusu</a></p>
+          </div>
+        </div>
+      </Transition>
     </div>
-    
     <!-- Album manager menu -->
     <Transition
       enter-active-class="transition-all duration-300 ease-out"
@@ -574,8 +623,12 @@ onUnmounted(() => {
       class="w-screen h-screen bg-[#030507] overflow-hidden relative"
       :class="{ hidden: !initialized }"
     >
-      <div v-if="processedTracks.length === 0" class="text-white text-center">
-        No tracks available to display.
+      <div v-if="processedTracks.length === 0" 
+           class="absolute inset-0 flex items-center justify-center">
+        <div class="text-white/60 text-xl text-center">
+          No tracks available to display. <br>
+          Add some albums to get started.
+        </div>
       </div>
       <div v-else id="zoomable-container" class="absolute top-0 left-0">
         <div
