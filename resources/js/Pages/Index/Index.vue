@@ -158,23 +158,72 @@ const initializeZoom = () => {
   const container = d3.select("#zoomable-container")
   const wrapper = d3.select("#zoomable-wrapper")
 
+  const getBounds = () => {
+    const tracks = processedTracks.value
+    if (!tracks.length) return { minX: 0, maxX: window.innerWidth, minY: 0, maxY: window.innerHeight }
+    
+    return tracks.reduce((bounds, track) => {
+      const radius = track.size / 2
+      bounds.minX = Math.min(bounds.minX, track.x - radius)
+      bounds.maxX = Math.max(bounds.maxX, track.x + radius)
+      bounds.minY = Math.min(bounds.minY, track.y - radius)
+      bounds.maxY = Math.max(bounds.maxY, track.y + radius)
+      return bounds
+    }, {
+      minX: Infinity,
+      maxX: -Infinity,
+      minY: Infinity,
+      maxY: -Infinity
+    })
+  }
+
   zoom = d3.zoom()
     .scaleExtent([0.2, 5])
     .on("zoom", (event) => {
-      currentTransform = event.transform
+      const bounds = getBounds()
+      const { transform } = event
+      
+      const boundsWidth = bounds.maxX - bounds.minX
+      const boundsHeight = bounds.maxY - bounds.minY
+      
+      const padding = {
+        x: boundsWidth * 0.05,
+        y: boundsHeight * 0.05
+      }
+      
+      const scaledBounds = {
+        minX: (bounds.minX - padding.x) * transform.k,
+        maxX: (bounds.maxX + padding.x) * transform.k,
+        minY: (bounds.minY - padding.y) * transform.k,
+        maxY: (bounds.maxY + padding.y) * transform.k
+      }
+      
+      // Ensure at least 25% of the bounds width/height is always visible
+      const minVisibleWidth = (boundsWidth + 2 * padding.x) * transform.k * 0.25
+      const minVisibleHeight = (boundsHeight + 2 * padding.y) * transform.k * 0.25
+      
+      // Calculate viewport constraints
+      const xMin = Math.min(-scaledBounds.maxX + window.innerWidth, -scaledBounds.minX - minVisibleWidth)
+      const xMax = Math.max(-scaledBounds.minX, -scaledBounds.maxX + window.innerWidth + minVisibleWidth)
+      const yMin = Math.min(-scaledBounds.maxY + window.innerHeight, -scaledBounds.minY - minVisibleHeight)
+      const yMax = Math.max(-scaledBounds.minY, -scaledBounds.maxY + window.innerHeight + minVisibleHeight)
+      
+      transform.x = Math.min(xMax, Math.max(xMin, transform.x))
+      transform.y = Math.min(yMax, Math.max(yMin, transform.y))
+      
+      currentTransform = transform
       container.style(
         "transform",
-        `translate(${event.transform.x}px, ${event.transform.y}px) scale(${event.transform.k})`
+        `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`
       )
     })
 
   wrapper.call(zoom)
 
-  const initialScale = 0.5 // Larger scale for smaller screens
+  // Initial zoom setup
+  const initialScale = 0.5
   const viewportWidth = window.innerWidth
   const viewportHeight = window.innerHeight
-
-  // Adjust centering dynamically
   const translateX = (viewportWidth - viewportWidth * initialScale) / 2
   const translateY = (viewportHeight - viewportHeight * initialScale) / 2
 
