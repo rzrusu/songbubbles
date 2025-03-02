@@ -1,3 +1,6 @@
+![Preview](https://imgur.com/t25KxoV.png)
+
+
 # SongBubbles
 
 This is a fun little project I'm currently working on. It pulls live data about music albums from the Spotify API and showcases each track in a sort of bubble chart. Made with Laravel in the backend and Inertiajs's Vue adapter for the frontend. The bubble simulation is handled using d3.js
